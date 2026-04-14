@@ -1,10 +1,11 @@
 import { defineConfig } from 'vite'
 
 export default defineConfig({
+  base: '/cineverse/',
   root: '.',
   build: {
     target: 'esnext',
-    minify: 'terser'
+    outDir: 'dist'
   },
   server: {
     port: 5173,
