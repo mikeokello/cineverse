@@ -49,6 +49,8 @@ const trailerIframe = document.getElementById('trailer-iframe');
 const closeModalBtn = document.getElementById('close-modal');
 const hamburger = document.querySelector('.hamburger');
 const navMenu = document.querySelector('.nav-menu');
+const searchInput = document.getElementById('search-input');
+const searchBtn = document.getElementById('search-btn');
 
 function createMovieCard(movie) {
   const card = document.createElement('div');
@@ -86,6 +88,27 @@ function closeModal() {
 function toggleMenu() {
   navMenu.classList.toggle('active');
   hamburger.classList.toggle('active');
+}
+
+function searchMovies(query) {
+  if (!query.trim()) {
+    displayMovies(movies);
+    navigateTo('movies');
+    return;
+  }
+
+  const filtered = movies.filter(movie =>
+    movie.title.toLowerCase().includes(query.toLowerCase()) ||
+    movie.desc.toLowerCase().includes(query.toLowerCase())
+  );
+
+  displayMovies(filtered);
+  navigateTo('movies');
+
+  if (filtered.length === 0) {
+    const moviesGrid = document.getElementById('movies-grid');
+    moviesGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; padding: 2rem; color: #999;">No movies found. Try another search.</p>';
+  }
 }
 
 function displayAbout() {
@@ -155,6 +178,25 @@ modal.addEventListener('click', (e) => {
 });
 
 hamburger.addEventListener('click', toggleMenu);
+
+// Search functionality
+searchBtn.addEventListener('click', () => {
+  const query = searchInput.value;
+  searchMovies(query);
+});
+
+searchInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+    const query = searchInput.value;
+    searchMovies(query);
+  }
+});
+
+searchInput.addEventListener('input', (e) => {
+  if (e.target.value.length === 0) {
+    displayMovies(movies);
+  }
+});
 
 // Initialize with API data
 fetchMovies();

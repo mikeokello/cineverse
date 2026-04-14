@@ -79,6 +79,52 @@ header::after {
   color: #e50914;
 }
 
+.search-bar {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 25px;
+  padding: 0.5rem 1rem;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+}
+
+.search-bar:hover,
+.search-bar:focus-within {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(229, 9, 20, 0.5);
+  box-shadow: 0 0 15px rgba(229, 9, 20, 0.2);
+}
+
+.search-bar input {
+  border: none;
+  background: transparent;
+  color: #ffffff;
+  font-size: 1rem;
+  padding: 0.5rem 0.5rem;
+  width: 200px;
+  outline: none;
+}
+
+.search-bar input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.search-bar button {
+  background: none;
+  border: none;
+  color: #e50914;
+  cursor: pointer;
+  font-size: 1.2rem;
+  padding: 0 0.5rem;
+  transition: transform 0.2s;
+}
+
+.search-bar button:hover {
+  transform: scale(1.15);
+}
+
 .hamburger {
   display: none;
   flex-direction: column;
@@ -316,6 +362,21 @@ footer p {
 
 /* Mobile styles */
 @media (max-width: 768px) {
+  .header-content {
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .search-bar {
+    order: 3;
+    width: 100%;
+    width: calc(100% - 4rem);
+  }
+
+  .search-bar input {
+    width: calc(100% - 40px);
+  }
+
   .nav-menu {
     position: fixed;
     top: 0;
