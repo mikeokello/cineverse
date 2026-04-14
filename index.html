@@ -32,6 +32,15 @@
   </header>
 
   <main>
+    <section id="search-results" class="search-results-section hidden">
+      <div class="search-header">
+        <h2>Search Results for "<span id="search-query-text"></span>"</h2>
+        <button id="clear-search-btn" class="clear-search-btn">✕ Clear Search</button>
+      </div>
+      <div class="search-results-count">Found <span id="results-count">0</span> movie(s)</div>
+      <div class="movies-grid" id="search-results-grid"></div>
+    </section>
+
     <section id="home" class="page-section active">
       <h2>Featured Movies</h2>
       <div class="movies-grid" id="home-grid"></div>

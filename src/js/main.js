@@ -91,9 +91,16 @@ function toggleMenu() {
 }
 
 function searchMovies(query) {
+  const searchResultsSection = document.getElementById('search-results');
+  const searchResultsGrid = document.getElementById('search-results-grid');
+  const resultsCount = document.getElementById('results-count');
+  const searchQueryText = document.getElementById('search-query-text');
+
+  // Hide all page sections
+  document.querySelectorAll('.page-section').forEach(sec => sec.classList.remove('active'));
+
   if (!query.trim()) {
-    displayMovies(movies);
-    navigateTo('movies');
+    searchResultsSection.classList.add('hidden');
     return;
   }
 
@@ -102,13 +109,36 @@ function searchMovies(query) {
     movie.desc.toLowerCase().includes(query.toLowerCase())
   );
 
-  displayMovies(filtered);
-  navigateTo('movies');
+  // Display search results
+  searchQueryText.textContent = query;
+  resultsCount.textContent = filtered.length;
+  searchResultsGrid.innerHTML = '';
 
   if (filtered.length === 0) {
-    const moviesGrid = document.getElementById('movies-grid');
-    moviesGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; padding: 2rem; color: #999;">No movies found. Try another search.</p>';
+    searchResultsGrid.innerHTML = `
+      <div style="grid-column: 1/-1; text-align: center; padding: 3rem 2rem;">
+        <p style="font-size: 1.3rem; color: #999; margin-bottom: 1rem;">😕 No movies found</p>
+        <p style="color: #666;">Try searching for a different movie title</p>
+      </div>
+    `;
+  } else {
+    filtered.forEach(movie => {
+      if (movie.img && movie.trailer) {
+        const card = createMovieCard(movie);
+        searchResultsGrid.appendChild(card);
+      }
+    });
   }
+
+  searchResultsSection.classList.remove('hidden');
+}
+
+function clearSearch() {
+  const searchInput = document.getElementById('search-input');
+  const searchResultsSection = document.getElementById('search-results');
+  searchInput.value = '';
+  searchResultsSection.classList.add('hidden');
+  navigateTo('home');
 }
 
 function displayAbout() {
@@ -193,10 +223,18 @@ searchInput.addEventListener('keypress', (e) => {
 });
 
 searchInput.addEventListener('input', (e) => {
-  if (e.target.value.length === 0) {
-    displayMovies(movies);
+  const query = e.target.value;
+  if (query.length >= 2) {
+    // Real-time search as user types
+    searchMovies(query);
+  } else if (query.length === 0) {
+    // Clear search when input is empty
+    clearSearch();
   }
 });
+
+// Clear search button
+document.getElementById('clear-search-btn').addEventListener('click', clearSearch);
 
 // Initialize with API data
 fetchMovies();
