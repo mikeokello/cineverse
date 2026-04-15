@@ -1,240 +1,196 @@
 ﻿let movies = [];
+let genresMap = {};
+let currentPage = 1;
+let loading = false;
+
 const API_KEY = '52b4a588b74613a90d56523f2f58b314';
 const TMDB_API_URL = 'https://api.themoviedb.org/3';
 
-// Fetch YouTube trailer ID for a movie
+// ---------------- LOCAL STORAGE SYSTEMS ----------------
+let favorites = JSON.parse(localStorage.getItem("favorites")) || [];
+let watchlist = JSON.parse(localStorage.getItem("watchlist")) || [];
+
+// ---------------- TOAST ----------------
+function showToast(message) {
+  const toast = document.createElement("div");
+  toast.className = "toast";
+  toast.innerText = message;
+  document.body.appendChild(toast);
+
+  setTimeout(() => toast.classList.add("show"), 100);
+  setTimeout(() => {
+    toast.classList.remove("show");
+    setTimeout(() => toast.remove(), 300);
+  }, 2000);
+}
+
+// ---------------- SKELETON LOADER ----------------
+function showSkeletons(container) {
+  container.innerHTML = "";
+  for (let i = 0; i < 6; i++) {
+    const sk = document.createElement("div");
+    sk.className = "skeleton-card";
+    sk.innerHTML = `<div class="skeleton-img"></div><div class="skeleton-text"></div>`;
+    container.appendChild(sk);
+  }
+}
+
+// ---------------- GENRES ----------------
+async function fetchGenres() {
+  const res = await fetch(`${TMDB_API_URL}/genre/movie/list?api_key=${API_KEY}`);
+  const data = await res.json();
+  data.genres.forEach(g => genresMap[g.id] = g.name);
+
+  createGenreFilter(data.genres);
+}
+
+function createGenreFilter(genres) {
+  const select = document.createElement("select");
+  select.id = "genre-filter";
+  select.innerHTML = `<option value="all">All Genres</option>`;
+  genres.forEach(g => {
+    select.innerHTML += `<option value="${g.id}">${g.name}</option>`;
+  });
+
+  select.addEventListener("change", () => {
+    filterByGenre(select.value);
+  });
+
+  document.querySelector(".header-content").appendChild(select);
+}
+
+function filterByGenre(id) {
+  const filtered = id === "all"
+    ? movies
+    : movies.filter(m => m.genre_ids?.includes(parseInt(id)));
+
+  displayMovies(filtered);
+}
+
+// ---------------- TRAILER ----------------
 async function getYouTubeTrailerId(movieId) {
   try {
     const response = await fetch(`${TMDB_API_URL}/movie/${movieId}/videos?api_key=${API_KEY}`);
     const data = await response.json();
-    const trailer = data.results?.find(video => video.type === 'Trailer' && video.site === 'YouTube');
+    const trailer = data.results?.find(v => v.type === 'Trailer' && v.site === 'YouTube');
     return trailer ? trailer.key : '';
-  } catch (error) {
-    console.error('Error fetching trailer:', error);
+  } catch {
     return '';
   }
 }
 
-// Fetch movies from TMDB API
-async function fetchMovies() {
+// ---------------- MOVIES FETCH (PAGINATION) ----------------
+async function fetchMovies(page = 1) {
+  if (loading) return;
+  loading = true;
+
+  const grid = document.getElementById("movies-grid");
+  if (page === 1) showSkeletons(grid);
+
   try {
-    const response = await fetch(`${TMDB_API_URL}/movie/popular?api_key=${API_KEY}&language=en-US&page=1`);
+    const response = await fetch(`${TMDB_API_URL}/movie/popular?api_key=${API_KEY}&language=en-US&page=${page}`);
     const data = await response.json();
-    
-    // Get trailers for each movie
+
     const moviesWithTrailers = await Promise.all(
-      data.results.slice(0, 50).map(async (movie) => {
+      data.results.map(async (movie) => {
         const trailerId = await getYouTubeTrailerId(movie.id);
         return {
+          ...movie,
           title: movie.title,
           img: `https://image.tmdb.org/t/p/w500${movie.poster_path}`,
           trailer: trailerId,
-          desc: movie.overview || 'No description available',
-          id: movie.id
+          desc: movie.overview || "No description",
         };
       })
     );
-    
-    movies = moviesWithTrailers.filter(m => m.img && m.trailer);
-    displayMovies(movies.slice(0, 20));
-    navigateTo('home');
-  } catch (error) {
-    console.error('Error fetching movies:', error);
+
+    movies = [...movies, ...moviesWithTrailers];
+    displayMovies(movies);
+
+  } catch (err) {
+    console.error(err);
   }
+
+  loading = false;
 }
 
-const moviesGrid = document.getElementById('movies-grid');
-const modal = document.getElementById('modal');
-const trailerIframe = document.getElementById('trailer-iframe');
-const closeModalBtn = document.getElementById('close-modal');
-const hamburger = document.querySelector('.hamburger');
-const navMenu = document.querySelector('.nav-menu');
-const searchInput = document.getElementById('search-input');
-const searchBtn = document.getElementById('search-btn');
-
+// ---------------- CARD ----------------
 function createMovieCard(movie) {
-  const card = document.createElement('div');
-  card.className = 'movie-card';
+  const isFav = favorites.includes(movie.id);
+  const isWatch = watchlist.includes(movie.id);
+
+  const card = document.createElement("div");
+  card.className = "movie-card";
+
   card.innerHTML = `
-    <img src="${movie.img}" alt="${movie.title} poster" class="movie-poster">
+    <img src="${movie.img}" class="movie-poster">
     <div class="movie-info">
       <h3 class="movie-title">${movie.title}</h3>
+
+      <div class="rating">⭐ ${movie.vote_average?.toFixed(1) || "N/A"}</div>
+
       <button class="play-btn" data-trailer="${movie.trailer}">PLAY</button>
+
+      <div class="actions">
+        <button class="fav-btn">${isFav ? "❤️" : "🤍"}</button>
+        <button class="watch-btn">${isWatch ? "✔ Watchlist" : "+ Watchlist"}</button>
+      </div>
     </div>
   `;
+
+  // favorites
+  card.querySelector(".fav-btn").onclick = () => {
+    toggleFavorite(movie.id);
+    showToast("Favorites updated ❤️");
+  };
+
+  // watchlist
+  card.querySelector(".watch-btn").onclick = () => {
+    toggleWatch(movie.id);
+    showToast("Watchlist updated ✔");
+  };
+
   return card;
 }
 
-function displayMovies(movieList) {
-  moviesGrid.innerHTML = '';
-  movieList.forEach(movie => {
+// ---------------- FAVORITES ----------------
+function toggleFavorite(id) {
+  favorites = favorites.includes(id)
+    ? favorites.filter(i => i !== id)
+    : [...favorites, id];
+
+  localStorage.setItem("favorites", JSON.stringify(favorites));
+}
+
+// ---------------- WATCHLIST ----------------
+function toggleWatch(id) {
+  watchlist = watchlist.includes(id)
+    ? watchlist.filter(i => i !== id)
+    : [...watchlist, id];
+
+  localStorage.setItem("watchlist", JSON.stringify(watchlist));
+}
+
+// ---------------- DISPLAY ----------------
+function displayMovies(list) {
+  const grid = document.getElementById("movies-grid");
+  grid.innerHTML = "";
+
+  list.forEach(movie => {
     if (movie.img && movie.trailer) {
-      const card = createMovieCard(movie);
-      moviesGrid.appendChild(card);
+      grid.appendChild(createMovieCard(movie));
     }
   });
 }
 
-function playTrailer(trailerId) {
-  trailerIframe.src = `https://www.youtube.com/embed/${trailerId}?autoplay=1&rel=0`;
-  modal.classList.remove('hidden');
-}
-
-function closeModal() {
-  modal.classList.add('hidden');
-  trailerIframe.src = '';
-}
-
-function toggleMenu() {
-  navMenu.classList.toggle('active');
-  hamburger.classList.toggle('active');
-}
-
-function searchMovies(query) {
-  const searchResultsSection = document.getElementById('search-results');
-  const searchResultsGrid = document.getElementById('search-results-grid');
-  const resultsCount = document.getElementById('results-count');
-  const searchQueryText = document.getElementById('search-query-text');
-
-  // Hide all page sections
-  document.querySelectorAll('.page-section').forEach(sec => sec.classList.remove('active'));
-
-  if (!query.trim()) {
-    searchResultsSection.classList.add('hidden');
-    return;
-  }
-
-  const filtered = movies.filter(movie =>
-    movie.title.toLowerCase().includes(query.toLowerCase()) ||
-    movie.desc.toLowerCase().includes(query.toLowerCase())
-  );
-
-  // Display search results
-  searchQueryText.textContent = query;
-  resultsCount.textContent = filtered.length;
-  searchResultsGrid.innerHTML = '';
-
-  if (filtered.length === 0) {
-    searchResultsGrid.innerHTML = `
-      <div style="grid-column: 1/-1; text-align: center; padding: 3rem 2rem;">
-        <p style="font-size: 1.3rem; color: #999; margin-bottom: 1rem;">😕 No movies found</p>
-        <p style="color: #666;">Try searching for a different movie title</p>
-      </div>
-    `;
-  } else {
-    filtered.forEach(movie => {
-      if (movie.img && movie.trailer) {
-        const card = createMovieCard(movie);
-        searchResultsGrid.appendChild(card);
-      }
-    });
-  }
-
-  searchResultsSection.classList.remove('hidden');
-}
-
-function clearSearch() {
-  const searchInput = document.getElementById('search-input');
-  const searchResultsSection = document.getElementById('search-results');
-  searchInput.value = '';
-  searchResultsSection.classList.add('hidden');
-  navigateTo('home');
-}
-
-function displayAbout() {
-  const aboutContainer = document.getElementById('about-container');
-  aboutContainer.innerHTML = '';
-  movies.forEach(movie => {
-    const card = document.createElement('div');
-    card.className = 'about-card';
-    card.innerHTML = `
-      <img src="${movie.img}" alt="${movie.title}" class="about-img">
-      <div class="about-content">
-        <h3>${movie.title}</h3>
-        <p>${movie.desc}</p>
-        <button class="play-btn" data-trailer="${movie.trailer}">WATCH TRAILER</button>
-      </div>
-    `;
-    aboutContainer.appendChild(card);
-  });
-}
-
-function navigateTo(page) {
-  document.querySelectorAll('.page-section').forEach(sec => sec.classList.remove('active'));
-  document.getElementById(page).classList.add('active');
-  
-  if (page === 'home') {
-    const homeGrid = document.getElementById('home-grid');
-    homeGrid.innerHTML = '';
-    movies.slice(0, 3).forEach(movie => {
-      const card = createMovieCard(movie);
-      homeGrid.appendChild(card);
-    });
-    homeGrid.addEventListener('click', (e) => {
-      if (e.target.classList.contains('play-btn')) {
-        const trailerId = e.target.getAttribute('data-trailer');
-        playTrailer(trailerId);
-      }
-    });
-  } else if (page === 'movies') {
-    displayMovies(movies);
-  } else if (page === 'about') {
-    displayAbout();
-  }
-}
-
-document.querySelectorAll('.nav-menu a').forEach(link => {
-  link.addEventListener('click', (e) => {
-    e.preventDefault();
-    const page = e.target.getAttribute('href').substring(1);
-    navigateTo(page);
-    navMenu.classList.remove('active');
-    hamburger.classList.remove('active');
-  });
-});
-
-document.addEventListener('click', (e) => {
-  if (e.target.classList.contains('play-btn')) {
-    const trailerId = e.target.getAttribute('data-trailer');
-    playTrailer(trailerId);
+// ---------------- INFINITE SCROLL ----------------
+window.addEventListener("scroll", () => {
+  if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
+    currentPage++;
+    fetchMovies(currentPage);
   }
 });
 
-closeModalBtn.addEventListener('click', closeModal);
-modal.addEventListener('click', (e) => {
-  if (e.target === modal) {
-    closeModal();
-  }
-});
-
-hamburger.addEventListener('click', toggleMenu);
-
-// Search functionality
-searchBtn.addEventListener('click', () => {
-  const query = searchInput.value;
-  searchMovies(query);
-});
-
-searchInput.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') {
-    const query = searchInput.value;
-    searchMovies(query);
-  }
-});
-
-searchInput.addEventListener('input', (e) => {
-  const query = e.target.value;
-  if (query.length >= 2) {
-    // Real-time search as user types
-    searchMovies(query);
-  } else if (query.length === 0) {
-    // Clear search when input is empty
-    clearSearch();
-  }
-});
-
-// Clear search button
-document.getElementById('clear-search-btn').addEventListener('click', clearSearch);
-
-// Initialize with API data
+// ---------------- INIT ----------------
+fetchGenres();
 fetchMovies();
